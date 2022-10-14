@@ -34,10 +34,12 @@ class InvertedPendulum(object):
         self.theta = np.random.uniform(-0.01,0.01)
         self.omega = 0
 
-    def get_state(self):
+    def get_state(self):    
+        return np.array([self.x_cart+np.random.normal(0,0.01),
+                self.v_cart+np.random.normal(0,0.01), self.theta+np.random.normal(0,0.01), self.omega+np.random.normal(0,0.01),1])
+    def get_real_state(self):
         return np.array([self.x_cart,
-                self.v_cart, self.theta, self.omega])
-
+                self.v_cart, self.theta, self.omega,1])
     def set_state(self, state):
         is_dead, t, x, v, theta, omega = state
         self.is_dead = is_dead
@@ -47,23 +49,37 @@ class InvertedPendulum(object):
         self.theta = theta
         self.omega = omega
 
-    def update_state(self, action):
+    def update_state_(self, action):
         """all the physics is here"""
         if self.is_dead:
             raise RuntimeError("tried to call update_state while state was dead")
         self.time += 1
         self.x_cart += self.v_cart
         # cart stops when it hits the wall
-        if self.x_cart <= self.CARTWIDTH / 2:
-            self.x_cart = self.CARTWIDTH / 2
-            self.v_cart = 0
-        elif self.x_cart >= self.WINDOWWIDTH - self.CARTWIDTH / 2:
-            self.x_cart = self.WINDOWWIDTH - self.CARTWIDTH / 2
-            self.v_cart = 0
+        if self.x_cart <= self.CARTWIDTH / 2 or self.x_cart >= self.WINDOWWIDTH - self.CARTWIDTH / 2:
+            self.x_cart = self.WINDOWWIDTH / 2
+            #self.v_cart = 0
         # term from angular velocity + term from motion of cart
         self.theta += self.omega + self.v_cart * np.cos(self.theta) / float(self.PENDULUMLENGTH)
         self.omega += self.GRAVITY * np.sin(self.theta) / float(self.PENDULUMLENGTH)
         self.v_cart+=action
+        if abs(self.theta) >= np.pi / 2:
+            self.is_dead = True
+        return self.time, self.x_cart, self.v_cart, self.theta, self.omega
+    def update_state(self, action):
+        """all the physics is here"""
+        if self.is_dead:
+            raise RuntimeError("tried to call update_state while state was dead")
+        self.time += 1
+        self.x_cart += self.v_cart+np.random.normal(0,0.0001)
+        # cart stops when it hits the wall
+        if self.x_cart <= self.CARTWIDTH / 2 or self.x_cart >= self.WINDOWWIDTH - self.CARTWIDTH / 2:
+            self.x_cart = self.WINDOWWIDTH / 2
+            #self.v_cart = 0
+        # term from angular velocity + term from motion of cart
+        self.theta += self.omega + self.v_cart * np.cos(self.theta) / float(self.PENDULUMLENGTH)
+        self.omega += self.GRAVITY * np.sin(self.theta) / float(self.PENDULUMLENGTH)
+        self.v_cart+=action+np.random.normal(0,0.0001)
         if abs(self.theta) >= np.pi / 2:
             self.is_dead = True
         return self.time, self.x_cart, self.v_cart, self.theta, self.omega
@@ -147,9 +163,11 @@ class InvertedPendulumGame(object):
         pygame.display.update()
 
     def game_round(self,controller):
+        np.random.seed(0)
         self.pendulum.reset_state()
         while not self.pendulum.is_dead:
-            t, x, _, theta, _ = self.pendulum.update_state(controller(self.pendulum.get_state()))
+            
+            t, x, _, theta, _ = self.pendulum.update_state(controller(self.pendulum.get_state(),self.pendulum.get_real_state()))
             self.time = t    
             self.surface.fill(self.WHITE)
             self.draw_cart(x, theta)
@@ -177,6 +195,7 @@ class InvertedPendulumGame(object):
 
     def game(self,controller):
         self.starting_page()
+        
         while True:
             for event in pygame.event.get():
                 if event.type == QUIT:
